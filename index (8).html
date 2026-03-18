@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TriFlow — Gestion Tri Sélectif</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080f0b;
+  --surface: #0f1a13;
+  --surface2: #162118;
+  --border: #1e3324;
+  --border2: #2a4a30;
+  --text: #e8f5e9;
+  --text2: #a5d6a7;
+  --text3: #5a7a60;
+  --green: #2E9B5A;
+  --green2: #1B6B3A;
+  --green3: #0D3B1E;
+  --red: #D32F2F;
+  --orange: #FF9800;
+  --blue: #2196F3;
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); overflow-x:hidden; min-height:100vh; min-height:100dvh; }
+button { font-family:inherit; cursor:pointer; border:none; outline:none; }
+select { font-family:inherit; cursor:pointer; outline:none; }
+
+/* ══ HEADER ══ */
+.header {
+  background: linear-gradient(135deg, var(--green3), var(--green2) 60%, var(--green));
+  padding: 16px 20px 44px;
+  position: relative; overflow: hidden;
+}
+.header::after { content:''; position:absolute; top:-40px; right:-50px; width:180px; height:180px; border-radius:50%; border:1px solid rgba(255,255,255,.06); }
+.header-top { display:flex; align-items:center; justify-content:space-between; }
+.header-brand { display:flex; align-items:center; gap:10px; }
+.header-logo { width:36px; height:36px; border-radius:9px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; font-size:18px; }
+.header-title { font-size:17px; font-weight:700; color:#fff; }
+.header-sub { font-size:10px; color:rgba(255,255,255,.5); font-weight:500; margin-top:1px; letter-spacing:.5px; }
+.header-store { text-align:center; margin-top:14px; font-size:11px; color:rgba(255,255,255,.65); font-weight:500; }
+
+/* Store selector */
+.store-select {
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.15);
+  color:#fff; font-size:11px; font-weight:600; padding:6px 10px; border-radius:8px;
+}
+.store-select option { background:var(--surface); color:var(--text); }
+
+/* ══ NAV TABS ══ */
+.nav { display:flex; gap:5px; justify-content:center; margin-top:-22px; position:relative; z-index:10; padding:0 16px; }
+.nav-btn {
+  padding:9px 20px; border-radius:24px; font-size:12px; font-weight:600;
+  transition: all .2s; flex:1; max-width:160px; text-align:center;
+  background:rgba(255,255,255,.06); color:rgba(255,255,255,.6);
+}
+.nav-btn.active { background:#F6FAF7; color:var(--green2); box-shadow:0 4px 16px rgba(0,0,0,.3); }
+.nav-badge { display:inline-block; margin-left:5px; background:rgba(46,155,90,.25); padding:1px 6px; border-radius:8px; font-size:10px; }
+
+/* ══ STATS ══ */
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:16px 16px 8px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+.stat-label { font-size:8px; color:var(--text3); text-transform:uppercase; letter-spacing:1.2px; font-weight:600; }
+.stat-value { font-size:20px; font-weight:700; font-family:'JetBrains Mono',monospace; margin-top:2px; }
+.stat-sub { font-size:9px; color:var(--text3); margin-top:1px; }
+
+/* ══ 3D CANVAS ══ */
+.canvas-wrap {
+  margin:8px 16px; border-radius:var(--radius); overflow:hidden;
+  border:1.5px solid var(--border); position:relative;
+  background:var(--surface); touch-action:none;
+}
+.canvas-wrap canvas { display:block; width:100%!important; height:100%!important; }
+.canvas-hint {
+  position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
+  font-size:9px; color:var(--text3); background:rgba(0,0,0,.5);
+  padding:3px 10px; border-radius:10px; backdrop-filter:blur(8px);
+  pointer-events:none; white-space:nowrap;
+}
+.canvas-legend {
+  position:absolute; top:8px; right:8px; display:flex; flex-direction:column; gap:3px;
+}
+.legend-item {
+  display:flex; align-items:center; gap:5px; font-size:8px; color:var(--text2);
+  background:rgba(0,0,0,.4); padding:2px 7px; border-radius:6px; backdrop-filter:blur(6px);
+}
+.legend-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+
+/* ══ ALERTS ══ */
+.alerts { padding:0 16px 8px; display:flex; flex-direction:column; gap:4px; }
+.alert {
+  display:flex; align-items:center; gap:8px; padding:8px 12px;
+  border-radius:8px; font-size:11px; font-weight:600;
+  animation: alertPulse 2s ease-in-out infinite;
+}
+.alert-danger { background:rgba(211,47,47,.12); border:1px solid rgba(211,47,47,.3); color:#EF5350; }
+.alert-warning { background:rgba(255,152,0,.1); border:1px solid rgba(255,152,0,.25); color:#FFB74D; }
+.alert-icon { font-size:14px; }
+@keyframes alertPulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+
+/* ══ ZONE LIST (map view) ══ */
+.zone-list { padding:8px 16px 24px; display:flex; flex-direction:column; gap:8px; }
+.zone-group {
+  border:1.5px dashed var(--border2); border-radius:var(--radius);
+  padding:10px; background:var(--surface);
+}
+.zone-group.danger { border:2px solid rgba(211,47,47,.3); border-style:solid; }
+.zone-group-title { font-size:10px; font-weight:700; text-align:center; margin-bottom:8px; letter-spacing:.5px; }
+.zone-bins { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.bin {
+  width:76px; border-radius:8px; padding:5px 0 6px;
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+  position:relative; overflow:hidden; transition: transform .15s;
+  cursor:pointer; -webkit-user-select:none; user-select:none;
+}
+.bin:active { transform:scale(.93); }
+.bin-fill { position:absolute; bottom:0; left:0; right:0; transition:height .5s; }
+.bin-badge {
+  width:20px; height:20px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-size:8px; font-weight:800; color:#fff;
+  position:relative; z-index:2;
+}
+.bin-icon { font-size:20px; position:relative; z-index:2; line-height:1.2; }
+.bin-label { font-size:9px; font-weight:700; position:relative; z-index:2; }
+.bin-pct { font-size:7px; font-family:'JetBrains Mono',monospace; opacity:.7; position:relative; z-index:2; }
+
+/* Scan pulse */
+.bin-pulse {
+  position:absolute; top:50%; left:50%; width:80px; height:80px;
+  margin:-40px 0 0 -40px; border-radius:50%; z-index:20;
+  animation: pulse .55s ease-out forwards;
+}
+@keyframes pulse { from{transform:scale(.2);opacity:.8} to{transform:scale(1.6);opacity:0} }
+
+/* ══ HISTORY ══ */
+.history { padding:8px 16px 24px; }
+.filters { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+.filter-select {
+  padding:6px 10px; border-radius:8px; font-size:11px;
+  background:var(--surface); color:var(--text2);
+  border:1px solid var(--border);
+}
+.filter-select option { background:var(--surface); }
+.btn-clear {
+  padding:6px 12px; border-radius:8px; font-size:10px; font-weight:600;
+  background:rgba(211,47,47,.1); color:#EF5350; border:1px solid rgba(211,47,47,.2);
+  margin-left:auto;
+}
+.btn-export {
+  padding:6px 12px; border-radius:8px; font-size:10px; font-weight:600;
+  background:rgba(33,150,243,.1); color:#64B5F6; border:1px solid rgba(33,150,243,.2);
+}
+.distrib-bar { display:flex; height:4px; border-radius:2px; overflow:hidden; margin-bottom:10px; background:rgba(255,255,255,.03); }
+.scan-row {
+  display:grid; grid-template-columns:auto 1fr auto;
+  align-items:center; gap:10px; padding:9px 12px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:9px; margin-bottom:4px;
+}
+.scan-row-new { animation: fadeIn .3s ease-out; }
+.scan-icon { font-size:18px; }
+.scan-info-title { font-size:11px; font-weight:600; }
+.scan-info-sub { font-size:9px; color:var(--text3); font-family:'JetBrains Mono',monospace; }
+.scan-right { text-align:right; }
+.scan-status {
+  font-size:9px; font-weight:600; padding:2px 7px; border-radius:4px;
+  display:inline-block; margin-bottom:2px;
+}
+.scan-time { font-size:9px; color:var(--text3); font-family:'JetBrains Mono',monospace; }
+.empty-state { text-align:center; padding:40px 20px; color:var(--text3); }
+.empty-state-icon { font-size:32px; margin-bottom:8px; }
+
+@keyframes fadeIn { from{opacity:0;transform:translateY(-5px)} to{opacity:1;transform:translateY(0)} }
+@keyframes slideIn { from{transform:translateX(60px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+/* ══ TOAST ══ */
+.toast {
+  position:fixed; top:14px; right:14px; left:14px; z-index:200;
+  border-radius:10px; padding:11px 16px;
+  backdrop-filter:blur(16px); animation:slideIn .25s ease-out;
+}
+.toast-success { background:rgba(27,107,58,.3); border:1px solid var(--green); }
+.toast-error { background:rgba(211,47,47,.25); border:1px solid var(--red); }
+.toast-title { font-size:12px; font-weight:700; }
+.toast-sub { font-size:10px; color:var(--text2); margin-top:2px; }
+
+/* ══ DASHBOARD ══ */
+.dash { padding:8px 16px 24px; }
+.dash-section { margin-bottom:16px; }
+.dash-section-title { font-size:10px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:8px; }
+.dash-chart {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px; position:relative; overflow:hidden;
+}
+.chart-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.chart-bar-label { font-size:10px; color:var(--text2); width:55px; text-align:right; flex-shrink:0; }
+.chart-bar-track { flex:1; height:20px; background:rgba(255,255,255,.03); border-radius:4px; overflow:hidden; position:relative; }
+.chart-bar-fill { height:100%; border-radius:4px; transition:width .6s ease; display:flex; align-items:center; padding-left:6px; }
+.chart-bar-val { font-size:9px; font-weight:700; color:#fff; font-family:'JetBrains Mono',monospace; }
+.chart-bar-count { font-size:10px; color:var(--text3); font-family:'JetBrains Mono',monospace; width:30px; text-align:right; flex-shrink:0; }
+
+/* Zone cards grid */
+.zone-cards { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+.zone-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:10px; text-align:center;
+}
+.zone-card-icon { font-size:20px; margin-bottom:4px; }
+.zone-card-id { font-size:10px; font-weight:700; }
+.zone-card-fill { font-size:18px; font-weight:700; font-family:'JetBrains Mono',monospace; margin-top:2px; }
+.zone-card-label { font-size:8px; color:var(--text3); text-transform:uppercase; letter-spacing:.8px; margin-top:2px; }
+
+/* Responsive */
+@media(min-width:640px) {
+  .stats { grid-template-columns:repeat(4,1fr); }
+  .zone-cards { grid-template-columns:repeat(4,1fr); }
+}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════
+   TRIFLOW — Professional Waste Sorting Management
+   Single-file HTML · Three.js 3D · GitHub Pages ready
+   ═══════════════════════════════════════════════════ */
+
+// ── DATA ──
+const STORES = [
+  { id: "villefranche", name: "Intermarché Villefranche" },
+  { id: "lyon6", name: "Intermarché Lyon 6e" },
+  { id: "belleville", name: "Intermarché Belleville" },
+];
+
+const ZONES = {
+  A: {
+    label: "ZONE A — TRI PRINCIPAL", color: "#1B6B3A",
+    items: [
+      { id:"A1", label:"Carton", icon:"📦", color:"#C49A2A" },
+      { id:"A2", label:"Films", icon:"🔄", color:"#D4A72C" },
+      { id:"A3", label:"Polyst.", icon:"🥡", color:"#7E57C2" },
+      { id:"A4", label:"Papier", icon:"📄", color:"#5C6BC0" },
+      { id:"A5", label:"Bio", icon:"🌱", color:"#43A047" },
+      { id:"A6", label:"T-V", icon:"🗑️", color:"#757575" },
+    ]
+  },
+  B: {
+    label: "ZONE B · 🔒 DANGEREUX", color: "#D32F2F",
+    items: [
+      { id:"B1", label:"Chimiq.", icon:"☠️", color:"#D32F2F" },
+      { id:"B2", label:"DEEE", icon:"🔋", color:"#D32F2F" },
+      { id:"B3", label:"Huiles", icon:"🛢️", color:"#E65100" },
+    ]
+  },
+  C: {
+    label: "ZONE C — COLLECTE CLIENT", color: "#7A9A80",
+    items: [
+      { id:"C1", label:"PET", icon:"🍾", color:"#2196F3" },
+      { id:"C2", label:"Verre", icon:"🫙", color:"#00897B" },
+      { id:"C3", label:"Lampes", icon:"💡", color:"#FF9800" },
+      { id:"C4", label:"Textile", icon:"👕", color:"#AB47BC" },
+    ]
+  },
+  D: {
+    label: "ZONE D — LOGISTIQUE", color: "#8D6E63",
+    items: [
+      { id:"D1", label:"Palettes", icon:"🪵", color:"#8D6E63" },
+    ]
+  },
+};
+
+const ALL_ITEMS = Object.values(ZONES).flatMap(z => z.items);
+const USERS = ["Marie L.","Thomas D.","Sofia R.","Lucas M.","Emma B."];
+
+// ── STATE ──
+let state = {
+  store: "villefranche",
+  view: "map", // map | history | dashboard
+  scans: [],
+  scanning: null,
+  toast: null,
+  filterZone: "all",
+  filterStatus: "all",
+  fillLevels: {},
+  threeInited: false,
+};
+
+function getKey() { return `triflow-${state.store}`; }
+function load() {
+  try { const r = localStorage.getItem(getKey()); state.scans = r ? JSON.parse(r) : []; } catch(e) { state.scans = []; }
+  // Compute fill levels from last scan per item
+  state.fillLevels = {};
+  ALL_ITEMS.forEach(it => {
+    const last = state.scans.find(s => s.itemId === it.id);
+    state.fillLevels[it.id] = last ? last.fillLevel : Math.floor(Math.random()*50+10);
+  });
+}
+function save() { try { localStorage.setItem(getKey(), JSON.stringify(state.scans)); } catch(e){} }
+
+function genScan(item) {
+  const success = Math.random() > .12;
+  const fill = Math.min(100, (state.fillLevels[item.id] || 50) + Math.floor(Math.random()*20+5));
+  return {
+    id: `SCN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,5).toUpperCase()}`,
+    ts: new Date().toISOString(),
+    itemId: item.id, itemLabel: item.label, itemIcon: item.icon, itemColor: item.color,
+    user: USERS[Math.floor(Math.random()*USERS.length)],
+    status: success ? "success" : "error",
+    result: success ? ["Bac conforme","Niveau OK","Trié correctement","Validé"][Math.floor(Math.random()*4)]
+                    : ["Contamination","Bac plein","Erreur de tri"][Math.floor(Math.random()*3)],
+    weight: success ? (Math.random()*120+5).toFixed(1) : "—",
+    fillLevel: fill,
+  };
+}
+
+function fmt(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"})+" "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+
+// ── ALERTS ──
+function getAlerts() {
+  const alerts = [];
+  ALL_ITEMS.forEach(it => {
+    const fill = state.fillLevels[it.id] || 0;
+    if (fill >= 90) alerts.push({ type:"danger", item:it, fill, msg:`${it.icon} ${it.id} ${it.label} — ${fill}% PLEIN` });
+    else if (fill >= 70) alerts.push({ type:"warning", item:it, fill, msg:`${it.icon} ${it.id} ${it.label} — ${fill}% remplissage élevé` });
+  });
+  return alerts.sort((a,b) => b.fill - a.fill);
+}
+
+// ── EXPORT CSV ──
+function exportCSV() {
+  const header = "ID;Date;Zone;Label;Utilisateur;Statut;Résultat;Poids (kg);Remplissage (%)";
+  const rows = state.scans.map(s =>
+    `${s.id};${fmt(s.ts)};${s.itemId};${s.itemLabel};${s.user};${s.status};${s.result};${s.weight};${s.fillLevel}`
+  );
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `triflow-${state.store}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ── 3D SCENE ──
+let scene, camera, renderer, bins3D = {}, animFrame;
+
+function init3D(container) {
+  if (!container) return;
+  const w = container.clientWidth, h = 280;
+  container.style.height = h + "px";
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a1510);
+  scene.fog = new THREE.FogExp2(0x0a1510, 0.012);
+
+  camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 1000);
+  camera.position.set(18, 16, 18);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  // Lights
+  const amb = new THREE.AmbientLight(0x334433, 0.6);
+  scene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffeedd, 1.0);
+  dir.position.set(10, 20, 8);
+  dir.castShadow = true;
+  dir.shadow.mapSize.width = 1024;
+  dir.shadow.mapSize.height = 1024;
+  dir.shadow.camera.near = 0.5;
+  dir.shadow.camera.far = 50;
+  dir.shadow.camera.left = -15;
+  dir.shadow.camera.right = 15;
+  dir.shadow.camera.top = 15;
+  dir.shadow.camera.bottom = -15;
+  scene.add(dir);
+
+  const pt = new THREE.PointLight(0x2E9B5A, 0.4, 30);
+  pt.position.set(-5, 8, -5);
+  scene.add(pt);
+
+  // Ground
+  const groundGeo = new THREE.PlaneGeometry(40, 40);
+  const groundMat = new THREE.MeshStandardMaterial({ color:0x0d1a12, roughness:0.9 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Grid
+  const grid = new THREE.GridHelper(40, 40, 0x1a3020, 0x1a3020);
+  grid.position.y = 0.01;
+  scene.add(grid);
+
+  // Zone labels on ground (simple planes)
+  const zonePositions = {
+    A: { x:-4, z:-3, items:ZONES.A.items, cols:3 },
+    B: { x:5, z:-3, items:ZONES.B.items, cols:2 },
+    C: { x:-4, z:5, items:ZONES.C.items, cols:4 },
+    D: { x:6, z:5, items:ZONES.D.items, cols:1 },
+  };
+
+  // Create bins
+  bins3D = {};
+  Object.entries(zonePositions).forEach(([zKey, zData]) => {
+    const items = zData.items;
+    items.forEach((item, i) => {
+      const col = i % zData.cols;
+      const row = Math.floor(i / zData.cols);
+      const x = zData.x + col * 2.8;
+      const z = zData.z + row * 2.8;
+      const fill = (state.fillLevels[item.id] || 30) / 100;
+      const color = new THREE.Color(item.color);
+
+      // Container (outer box — wireframe-ish)
+      const outerGeo = new THREE.BoxGeometry(2, 2.5, 2);
+      const outerMat = new THREE.MeshStandardMaterial({
+        color: color, transparent:true, opacity:0.15, roughness:0.6,
+      });
+      const outer = new THREE.Mesh(outerGeo, outerMat);
+      outer.position.set(x, 1.25, z);
+      outer.castShadow = true;
+      outer.receiveShadow = true;
+      scene.add(outer);
+
+      // Wireframe edges
+      const edges = new THREE.EdgesGeometry(outerGeo);
+      const lineMat = new THREE.LineBasicMaterial({ color:color, transparent:true, opacity:0.5 });
+      const wireframe = new THREE.LineSegments(edges, lineMat);
+      wireframe.position.copy(outer.position);
+      scene.add(wireframe);
+
+      // Fill level (inner box)
+      const fillH = Math.max(0.05, fill * 2.3);
+      const fillGeo = new THREE.BoxGeometry(1.8, fillH, 1.8);
+      const fillMat = new THREE.MeshStandardMaterial({
+        color: color, transparent:true, opacity:0.6, roughness:0.4, metalness:0.1,
+      });
+      const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+      fillMesh.position.set(x, fillH/2 + 0.1, z);
+      fillMesh.castShadow = true;
+      scene.add(fillMesh);
+
+      // Glow at top if > 80%
+      if (fill > 0.8) {
+        const glowGeo = new THREE.SphereGeometry(0.3, 16, 16);
+        const glowMat = new THREE.MeshBasicMaterial({ color: fill > 0.9 ? 0xD32F2F : 0xFF9800, transparent:true, opacity:0.7 });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        glow.position.set(x, 2.8, z);
+        scene.add(glow);
+        glow.userData.pulse = true;
+      }
+
+      bins3D[item.id] = { outer, wireframe, fillMesh, fillMat, x, z, color };
+    });
+  });
+
+  // Zone boundary markers
+  Object.entries(zonePositions).forEach(([zKey, zData]) => {
+    const zColor = new THREE.Color(ZONES[zKey].color);
+    const items = zData.items;
+    const maxCol = Math.min(items.length, zData.cols);
+    const maxRow = Math.ceil(items.length / zData.cols);
+    const w = maxCol * 2.8 + 0.6;
+    const d = maxRow * 2.8 + 0.6;
+    const cx = zData.x + (maxCol-1)*1.4;
+    const cz = zData.z + (maxRow-1)*1.4;
+
+    const borderGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, 0.05, d));
+    const borderMat = new THREE.LineBasicMaterial({ color: zColor, transparent:true, opacity:0.4 });
+    const border = new THREE.LineSegments(borderGeo, borderMat);
+    border.position.set(cx, 0.02, cz);
+    scene.add(border);
+  });
+
+  // Touch / mouse orbit
+  let isDragging = false, prevX = 0, prevY = 0;
+  let theta = Math.PI/4, phi = Math.PI/4, radius = 26;
+
+  function updateCam() {
+    camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
+    camera.position.y = radius * Math.cos(phi);
+    camera.position.z = radius * Math.sin(phi) * Math.sin(theta);
+    camera.lookAt(0, 0, 0);
+  }
+
+  const el = renderer.domElement;
+  el.addEventListener("pointerdown", e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; });
+  el.addEventListener("pointermove", e => {
+    if (!isDragging) return;
+    const dx = e.clientX - prevX, dy = e.clientY - prevY;
+    theta -= dx * 0.008;
+    phi = Math.max(0.3, Math.min(1.4, phi + dy * 0.008));
+    prevX = e.clientX; prevY = e.clientY;
+    updateCam();
+  });
+  el.addEventListener("pointerup", () => isDragging = false);
+  el.addEventListener("pointerleave", () => isDragging = false);
+  el.addEventListener("wheel", e => {
+    radius = Math.max(12, Math.min(40, radius + e.deltaY * 0.02));
+    updateCam();
+  }, { passive:true });
+
+  // Animate
+  let clock = new THREE.Clock();
+  function animate() {
+    animFrame = requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+
+    // Pulse glow spheres
+    scene.traverse(obj => {
+      if (obj.userData.pulse) {
+        obj.material.opacity = 0.4 + Math.sin(t * 3) * 0.3;
+        obj.scale.setScalar(1 + Math.sin(t * 3) * 0.15);
+      }
+    });
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Resize
+  const ro = new ResizeObserver(() => {
+    const nw = container.clientWidth;
+    renderer.setSize(nw, h);
+    camera.aspect = nw / h;
+    camera.updateProjectionMatrix();
+  });
+  ro.observe(container);
+
+  state.threeInited = true;
+}
+
+function update3DFill(itemId) {
+  const b = bins3D[itemId];
+  if (!b) return;
+  const fill = (state.fillLevels[itemId] || 30) / 100;
+  const fillH = Math.max(0.05, fill * 2.3);
+  b.fillMesh.geometry.dispose();
+  b.fillMesh.geometry = new THREE.BoxGeometry(1.8, fillH, 1.8);
+  b.fillMesh.position.y = fillH / 2 + 0.1;
+  b.fillMat.opacity = 0.4 + fill * 0.4;
+}
+
+function destroy3D() {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  if (renderer) renderer.dispose();
+  scene = null; camera = null; renderer = null; bins3D = {};
+  state.threeInited = false;
+}
+
+// ── RENDER ──
+function render() {
+  const app = document.getElementById("app");
+  const alerts = getAlerts();
+  const successCount = state.scans.filter(s => s.status === "success").length;
+  const errorCount = state.scans.filter(s => s.status === "error").length;
+  const rate = state.scans.length > 0 ? ((successCount / state.scans.length) * 100).toFixed(0) : "—";
+  const storeName = STORES.find(s => s.id === state.store)?.name || "";
+
+  let html = "";
+
+  // Toast
+  if (state.toast) {
+    const t = state.toast;
+    html += `<div class="toast toast-${t.status}">
+      <div class="toast-title">${t.itemIcon} ${t.status==="success"?"✓ Scan réussi":"✗ Erreur"} — ${t.itemId}</div>
+      <div class="toast-sub">${t.result} · ${t.user}</div>
+    </div>`;
+  }
+
+  // Header
+  html += `<div class="header">
+    <div class="header-top">
+      <div class="header-brand">
+        <div class="header-logo">♻️</div>
+        <div>
+          <div class="header-title">TriFlow</div>
+          <div class="header-sub">GESTION TRI SÉLECTIF</div>
+        </div>
+      </div>
+      <select class="store-select" onchange="switchStore(this.value)">
+        ${STORES.map(s => `<option value="${s.id}" ${s.id===state.store?"selected":""}>${s.name}</option>`).join("")}
+      </select>
+    </div>
+    <div class="header-store">📍 ${storeName}</div>
+  </div>`;
+
+  // Nav
+  const views = [
+    { key:"map", label:"🗺️ Zones" },
+    { key:"dashboard", label:"📊 Stats" },
+    { key:"history", label:`📋 Scans${state.scans.length?` (${state.scans.length})`:""}` },
+  ];
+  html += `<div class="nav">
+    ${views.map(v => `<button class="nav-btn ${state.view===v.key?"active":""}" onclick="switchView('${v.key}')">${v.label}</button>`).join("")}
+  </div>`;
+
+  // Stats
+  html += `<div class="stats">
+    <div class="stat-card"><div class="stat-label">Scans</div><div class="stat-value" style="color:#4CAF50">${state.scans.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Réussite</div><div class="stat-value" style="color:#A5D6A7">${rate}%</div><div class="stat-sub">${successCount}✓ / ${errorCount}✗</div></div>
+    <div class="stat-card"><div class="stat-label">Alertes</div><div class="stat-value" style="color:${alerts.length>0?"#EF5350":"#4CAF50"}">${alerts.length}</div><div class="stat-sub">${alerts.filter(a=>a.type==="danger").length} critiques</div></div>
+  </div>`;
+
+  // Alerts
+  if (alerts.length > 0 && state.view === "map") {
+    html += `<div class="alerts">
+      ${alerts.slice(0,3).map(a => `<div class="alert alert-${a.type}"><span class="alert-icon">${a.type==="danger"?"🔴":"🟡"}</span>${a.msg}</div>`).join("")}
+    </div>`;
+  }
+
+  // ── MAP VIEW ──
+  if (state.view === "map") {
+    html += `<div class="canvas-wrap" id="three-container">
+      <div class="canvas-hint">↔️ Glisser pour tourner · 🤏 Pincer pour zoomer</div>
+      <div class="canvas-legend">
+        ${Object.entries(ZONES).map(([k,z]) => `<div class="legend-item"><div class="legend-dot" style="background:${z.color}"></div>${k}</div>`).join("")}
+      </div>
+    </div>`;
+
+    html += `<div class="zone-list">`;
+    Object.entries(ZONES).forEach(([k, z]) => {
+      html += `<div class="zone-group ${k==="B"?"danger":""}">
+        <div class="zone-group-title" style="color:${z.color}">${z.label}</div>
+        <div class="zone-bins">`;
+      z.items.forEach(item => {
+        const fill = state.fillLevels[item.id] || 0;
+        const isScanning = state.scanning === item.id;
+        html += `<div class="bin" style="background:${item.color}12;border:2px solid ${item.color};${isScanning?"transform:scale(.93)":""}" onclick="doScan('${item.id}')">
+          <div class="bin-fill" style="height:${fill}%;background:${item.color}25"></div>
+          ${isScanning?`<div class="bin-pulse" style="border:3px solid ${item.color}"></div>`:""}
+          <div class="bin-badge" style="background:${item.color}">${item.id}</div>
+          <div class="bin-icon">${item.icon}</div>
+          <div class="bin-label" style="color:${item.color}">${item.label}</div>
+          <div class="bin-pct" style="color:${item.color}">${fill}%</div>
+        </div>`;
+      });
+      html += `</div></div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ── DASHBOARD VIEW ──
+  if (state.view === "dashboard") {
+    html += `<div class="dash">`;
+
+    // Fill levels overview
+    html += `<div class="dash-section">
+      <div class="dash-section-title">Niveaux de remplissage</div>
+      <div class="zone-cards">`;
+    ALL_ITEMS.forEach(item => {
+      const fill = state.fillLevels[item.id] || 0;
+      const fillColor = fill >= 90 ? "#EF5350" : fill >= 70 ? "#FFB74D" : "#4CAF50";
+      html += `<div class="zone-card" style="border-left:3px solid ${item.color}">
+        <div class="zone-card-icon">${item.icon}</div>
+        <div class="zone-card-id" style="color:${item.color}">${item.id} ${item.label}</div>
+        <div class="zone-card-fill" style="color:${fillColor}">${fill}%</div>
+        <div class="zone-card-label">remplissage</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+
+    // Scans per zone chart
+    html += `<div class="dash-section">
+      <div class="dash-section-title">Scans par zone</div>
+      <div class="dash-chart">`;
+    const maxScans = Math.max(1, ...ALL_ITEMS.map(it => state.scans.filter(s => s.itemId === it.id).length));
+    ALL_ITEMS.forEach(item => {
+      const count = state.scans.filter(s => s.itemId === item.id).length;
+      const pct = (count / maxScans) * 100;
+      html += `<div class="chart-bar-row">
+        <div class="chart-bar-label">${item.icon} ${item.id}</div>
+        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${item.color}"><span class="chart-bar-val">${count > 0 ? count : ""}</span></div></div>
+        <div class="chart-bar-count">${count}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+
+    // Success/Error breakdown
+    html += `<div class="dash-section">
+      <div class="dash-section-title">Taux de conformité par zone</div>
+      <div class="dash-chart">`;
+    Object.entries(ZONES).forEach(([k, z]) => {
+      const zoneScans = state.scans.filter(s => s.itemId.startsWith(k));
+      const zoneSuccess = zoneScans.filter(s => s.status === "success").length;
+      const zoneRate = zoneScans.length > 0 ? ((zoneSuccess / zoneScans.length) * 100).toFixed(0) : "—";
+      const pct = zoneScans.length > 0 ? (zoneSuccess / zoneScans.length) * 100 : 0;
+      const barColor = pct >= 80 ? "#4CAF50" : pct >= 50 ? "#FFB74D" : "#EF5350";
+      html += `<div class="chart-bar-row">
+        <div class="chart-bar-label" style="color:${z.color}">Zone ${k}</div>
+        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${barColor}"><span class="chart-bar-val">${zoneRate !== "—" ? zoneRate+"%" : ""}</span></div></div>
+        <div class="chart-bar-count">${zoneScans.length}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+
+    html += `</div>`;
+  }
+
+  // ── HISTORY VIEW ──
+  if (state.view === "history") {
+    const filtered = state.scans.filter(s =>
+      (state.filterZone === "all" || s.itemId.startsWith(state.filterZone)) &&
+      (state.filterStatus === "all" || s.status === state.filterStatus)
+    );
+
+    html += `<div class="history">
+      <div class="filters">
+        <select class="filter-select" onchange="setFilter('zone',this.value)">
+          <option value="all" ${state.filterZone==="all"?"selected":""}>Toutes zones</option>
+          <option value="A" ${state.filterZone==="A"?"selected":""}>Zone A</option>
+          <option value="B" ${state.filterZone==="B"?"selected":""}>Zone B</option>
+          <option value="C" ${state.filterZone==="C"?"selected":""}>Zone C</option>
+          <option value="D" ${state.filterZone==="D"?"selected":""}>Zone D</option>
+        </select>
+        <select class="filter-select" onchange="setFilter('status',this.value)">
+          <option value="all" ${state.filterStatus==="all"?"selected":""}>Tous</option>
+          <option value="success" ${state.filterStatus==="success"?"selected":""}>✓ OK</option>
+          <option value="error" ${state.filterStatus==="error"?"selected":""}>✗ Err.</option>
+        </select>
+        <button class="btn-export" onclick="exportCSV()">📥 CSV</button>
+        ${state.scans.length > 0 ? `<button class="btn-clear" onclick="clearAll()">🗑 Effacer</button>` : ""}
+      </div>`;
+
+    if (state.scans.length > 0) {
+      html += `<div class="distrib-bar">`;
+      ALL_ITEMS.forEach(item => {
+        const count = state.scans.filter(s => s.itemId === item.id).length;
+        const pct = (count / state.scans.length) * 100;
+        if (pct > 0) html += `<div style="width:${pct}%;background:${item.color}" title="${item.id}: ${count}"></div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (filtered.length === 0) {
+      html += `<div class="empty-state"><div class="empty-state-icon">📭</div><div>Aucun scan</div></div>`;
+    } else {
+      filtered.forEach((s, i) => {
+        const statusClass = s.status === "success" ? "color:#4CAF50;background:rgba(76,175,80,.1)" : "color:#EF5350;background:rgba(239,83,80,.1)";
+        html += `<div class="scan-row ${i===0?"scan-row-new":""}">
+          <div class="scan-icon">${s.itemIcon}</div>
+          <div>
+            <div class="scan-info-title">${s.itemId} · ${s.itemLabel}</div>
+            <div class="scan-info-sub">${s.user} · ${s.id}</div>
+          </div>
+          <div class="scan-right">
+            <div class="scan-status" style="${statusClass}">${s.status==="success"?"✓":"✗"} ${s.result}</div>
+            <div class="scan-time">${fmt(s.ts)}</div>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  }
+
+  app.innerHTML = html;
+
+  // Init 3D after DOM update
+  if (state.view === "map") {
+    requestAnimationFrame(() => {
+      const container = document.getElementById("three-container");
+      if (container && !state.threeInited) {
+        init3D(container);
+      }
+    });
+  }
+}
+
+// ── ACTIONS ──
+window.switchView = function(v) {
+  if (state.view === "map" && v !== "map") destroy3D();
+  state.view = v;
+  render();
+};
+
+window.switchStore = function(id) {
+  if (state.view === "map") destroy3D();
+  state.store = id;
+  load();
+  render();
+};
+
+window.doScan = function(itemId) {
+  if (state.scanning) return;
+  const item = ALL_ITEMS.find(i => i.id === itemId);
+  if (!item) return;
+
+  state.scanning = itemId;
+  render();
+
+  setTimeout(() => {
+    const scan = genScan(item);
+    state.scans.unshift(scan);
+    state.fillLevels[item.id] = scan.fillLevel;
+    save();
+    state.scanning = null;
+    state.toast = scan;
+    render();
+
+    // Update 3D fill
+    if (state.threeInited) update3DFill(item.id);
+
+    setTimeout(() => { state.toast = null; render(); }, 2500);
+  }, 550);
+};
+
+window.setFilter = function(type, val) {
+  if (type === "zone") state.filterZone = val;
+  if (type === "status") state.filterStatus = val;
+  render();
+};
+
+window.clearAll = function() {
+  if (!confirm("Effacer tout l'historique de ce magasin ?")) return;
+  state.scans = [];
+  state.fillLevels = {};
+  ALL_ITEMS.forEach(it => { state.fillLevels[it.id] = Math.floor(Math.random()*30+5); });
+  save();
+  if (state.threeInited) {
+    destroy3D();
+    state.threeInited = false;
+  }
+  render();
+};
+
+// ── INIT ──
+load();
+render();
+</script>
+</body>
+</html>
